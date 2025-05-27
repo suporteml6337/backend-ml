@@ -24,13 +24,14 @@ app.post("/gerar-pix", async (req, res) => {
     streetNumber,
     neighborhood,
     city,
-    phone,
+    phone
   } = req.body;
 
   if (!amount || !cpf || !street || !streetNumber || !neighborhood || !city) {
     return res.status(400).json({ error: "Dados incompletos" });
   }
 
+  // Dados da transação
   const data = {
     amount,
     description: `Compra de: ${name}`,
@@ -41,7 +42,7 @@ app.post("/gerar-pix", async (req, res) => {
       phone: phone || "+5511999998888",
       document: {
         number: cpf,
-        type: "CPF",
+        type: "CPF"
       },
       address: {
         street,
@@ -51,16 +52,16 @@ app.post("/gerar-pix", async (req, res) => {
         neighborhood,
         city,
         state: "SP",
-        country: "BR",
-      },
+        country: "BR"
+      }
     },
     items: [
       {
         title: name || "Produto Teste",
         unitPrice: amount,
-        quantity: 1,
-      },
-    ],
+        quantity: 1
+      }
+    ]
   };
 
   try {
@@ -69,8 +70,10 @@ app.post("/gerar-pix", async (req, res) => {
       data,
       {
         headers: {
-          Authorization: basicAffirmation,
-        },
+          Authorization: basicAuth,           // ✅ Correção feita aqui
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        }
       }
     );
 
@@ -81,13 +84,14 @@ app.post("/gerar-pix", async (req, res) => {
     }
 
     res.json({
-      redirect: `/cod.html?copiacola=${encodeURIComponent(pixCode)}`,
+      redirect: `/cod.html?copiacola=${encodeURIComponent(pixCode)}`
     });
+
   } catch (err) {
     console.error("Erro ao gerar PIX:", err.response?.data || err.message);
     return res.status(500).json({
       error: "Falha ao gerar PIX",
-      details: err.response?.data || err.message,
+      details: err.response?.data || err.message
     });
   }
 });
