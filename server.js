@@ -20,7 +20,7 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).json({});
+    return res.status(200).end(); // Resposta válida ao preflight
   }
 
   next();
@@ -33,8 +33,8 @@ app.use(express.json());
 app.post("/gerar-pix", async (req, res) => {
   const {
     amount,
-    name,
-    email,
+    name: customerName,   // Renomeado pra evitar confusão
+    email: customerEmail,
     cpf,
     street,
     streetNumber,
@@ -51,11 +51,11 @@ app.post("/gerar-pix", async (req, res) => {
   // Dados da transação
   const data = {
     amount,
-    description: `Compra de: ${name}`,
+    description: `Compra via PIX`,
     paymentMethod: "PIX",
     customer: {
-      name,
-      email: email || "cliente@example.com",
+      name: customerName, // Agora é mais claro que não é o título do produto
+      email: customerEmail || "cliente@example.com",
       phone: phone || "+5511999998888",
       document: {
         number: cpf,
@@ -73,7 +73,7 @@ app.post("/gerar-pix", async (req, res) => {
       }
     },
     items: [{
-      title: name || "Produto Teste",
+      title: "Produto Comprado",
       unitPrice: amount,
       quantity: 1
     }]
@@ -101,13 +101,12 @@ app.post("/gerar-pix", async (req, res) => {
       return res.status(500).json({ error: "QR Code não recebido da API" });
     }
 
-    // Redireciona pra página final
+    // Redireciona pra página final no seu site
     res.json({
-      redirect: `https://appmercadodigital.com/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixCode)}`
+      redirect: `/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixCode)}`
     });
 
   } catch (err) {
-    // Mostra detalhes do erro
     let errorMessage = err.message;
 
     if (err.response) {
