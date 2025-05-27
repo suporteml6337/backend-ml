@@ -20,7 +20,7 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).end(); // Resposta válida ao preflight
+    return res.status(200).end(); // Resposta ao preflight
   }
 
   next();
@@ -33,28 +33,29 @@ app.use(express.json());
 app.post("/gerar-pix", async (req, res) => {
   const {
     amount,
-    name: customerName,   // Renomeado pra evitar confusão
+    name: customerName,
     email: customerEmail,
     cpf,
     street,
     streetNumber,
     neighborhood,
     city,
-    phone
+    phone,
+    productId   // 👈 Agora incluímos o ID do produto aqui
   } = req.body;
 
   // Valida campos obrigatórios
-  if (!amount || !cpf || !street || !streetNumber || !neighborhood || !city) {
-    return res.status(400).json({ error: "Dados incompletos" });
+  if (!amount || !cpf || !street || !streetNumber || !neighborhood || !city || !productId) {
+    return res.status(400).json({ error: "Dados incompletos. Faltando informações de produto ou cliente." });
   }
 
   // Dados da transação
   const data = {
     amount,
-    description: `Compra via PIX`,
+    description: `Compra via PIX - Produto ID: ${productId}`,
     paymentMethod: "PIX",
     customer: {
-      name: customerName, // Agora é mais claro que não é o título do produto
+      name: customerName,
       email: customerEmail || "cliente@example.com",
       phone: phone || "+5511999998888",
       document: {
@@ -88,7 +89,7 @@ app.post("/gerar-pix", async (req, res) => {
         headers: {
           Authorization: basicAuth,
           "Content-Type": "application/json",
-          Accept: "application/json"
+          "Accept": "application/json"
         },
         timeout: 10000
       }
@@ -101,9 +102,9 @@ app.post("/gerar-pix", async (req, res) => {
       return res.status(500).json({ error: "QR Code não recebido da API" });
     }
 
-    // Redireciona pra página final no seu site
+    // ✅ Redireciona pra página final com todos os dados na URL
     res.json({
-      redirect: `/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixCode)}`
+      redirect: `/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixCode)}&produto=${encodeURIComponent(productId)}&cpf=${encodeURIComponent(cpf)}`
     });
 
   } catch (err) {
