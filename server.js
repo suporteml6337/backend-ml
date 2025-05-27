@@ -41,21 +41,21 @@ app.post("/gerar-pix", async (req, res) => {
     neighborhood,
     city,
     phone,
-    productId   // 👈 Agora incluímos o ID do produto aqui
+    productId
   } = req.body;
 
-  // Valida campos obrigatórios
-  if (!amount || !cpf || !street || !streetNumber || !neighborhood || !city || !productId) {
-    return res.status(400).json({ error: "Dados incompletos. Faltando informações de produto ou cliente." });
+  // Valida campos mínimos pra gerar o PIX
+  if (!amount || !cpf || !street || !streetNumber || !neighborhood || !city) {
+    return res.status(400).json({ error: "Dados essenciais incompletos" });
   }
 
-  // Dados da transação
+  // Dados da transação (campos obrigatórios)
   const data = {
     amount,
-    description: `Compra via PIX - Produto ID: ${productId}`,
+    description: `Compra via PIX`,
     paymentMethod: "PIX",
     customer: {
-      name: customerName,
+      name: customerName || "Cliente Desconhecido",
       email: customerEmail || "cliente@example.com",
       phone: phone || "+5511999998888",
       document: {
@@ -81,7 +81,6 @@ app.post("/gerar-pix", async (req, res) => {
   };
 
   try {
-    // Envia dados pra API Payevo
     const response = await axios.post(
       "https://api.payevo.com.br/functions/v1/transactions ",
       data,
@@ -95,17 +94,21 @@ app.post("/gerar-pix", async (req, res) => {
       }
     );
 
-    // Extrai o QR Code
     const pixCode = response.data?.pix?.qrcode;
     if (!pixCode) {
       console.error("❌ QR Code não encontrado:", response.data);
       return res.status(500).json({ error: "QR Code não recebido da API" });
     }
 
-    // ✅ Redireciona pra página final com todos os dados na URL
-    res.json({
-      redirect: `/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixCode)}&produto=${encodeURIComponent(productId)}&cpf=${encodeURIComponent(cpf)}`
-    });
+    // ✅ Campos na URL agora são OPCIONAIS
+    let redirectUrl = `/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixCode)}`;
+
+    // ✅ Adiciona apenas se existirem
+    if (productId) redirectUrl += `&produto=${encodeURIComponent(productId)}`;
+    if (cpf) redirectUrl += `&cpf=${encodeURIComponent(cpf)}`;
+
+    // ✅ Redireciona com os dados opcionais
+    res.json({ redirect: redirectUrl });
 
   } catch (err) {
     let errorMessage = err.message;
