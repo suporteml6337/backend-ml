@@ -1,5 +1,22 @@
+const express = require("express");
+const axios = require("axios");
+const { Buffer } = require("buffer");
+
+// ✅ Cria o app do Express
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// 🔐 Sua chave secreta do Payevo
+const SECRET_KEY = "sk_like_Bz6zlBxSxwtWEuhIBSLkRUNC3q7BG8J9Q4Nezrbct92IVr6g";
+
+// Codifica autenticação Basic Auth
+const basicAuth = "Basic " + Buffer.from(`${SECRET_KEY}:x`).toString("base64");
+
+// Middleware pra receber JSON
+app.use(express.json());
+
 // Rota POST pra gerar PIX
-app.post("https://backend-ml-1-4z88.onrender.com/gerar-pix", async (req, res) => {
+app.post("/gerar-pix", async (req, res) => {
   const {
     amount,
     name,
@@ -24,7 +41,10 @@ app.post("https://backend-ml-1-4z88.onrender.com/gerar-pix", async (req, res) =>
       name,
       email: email || "cliente@example.com",
       phone: phone || "+5511999998888",
-      document: { number: cpf, type: "CPF" },
+      document: {
+        number: cpf,
+        type: "CPF"
+      },
       address: {
         street,
         streetNumber,
@@ -59,10 +79,8 @@ app.post("https://backend-ml-1-4z88.onrender.com/gerar-pix", async (req, res) =>
 
     const pixCode = response.data?.pix?.qrcode;
     if (!pixCode) {
-      return res.status(500).json({
-        error: "QR Code não recebido da API",
-        api_response: response.data
-      });
+      console.error("QR Code não encontrado:", response.data);
+      return res.status(500).json({ error: "QR Code não recebido da API" });
     }
 
     res.json({
@@ -70,22 +88,15 @@ app.post("https://backend-ml-1-4z88.onrender.com/gerar-pix", async (req, res) =>
     });
 
   } catch (err) {
-    let errorMessage = "Erro desconhecido";
-
-    if (err.response) {
-      // Erro com resposta da API Payevo
-      errorMessage = `API Payevo respondeu com código ${err.response.status}: ` + JSON.stringify(err.response.data);
-    } else if (err.request) {
-      // Nenhuma resposta foi recebida
-      errorMessage = `Sem resposta da API: ${err.message}`;
-    } else {
-      // Outro erro qualquer
-      errorMessage = err.message;
-    }
-
+    console.error("Erro ao gerar PIX:", err.response?.data || err.message);
     return res.status(500).json({
       error: "Falha ao gerar PIX",
-      details: errorMessage
+      details: err.response?.data || err.message
     });
   }
+});
+
+// ✅ Inicia o servidor
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
