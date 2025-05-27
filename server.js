@@ -1,5 +1,5 @@
 // Rota POST pra gerar PIX
-app.post("/gerar-pix", async (req, res) => {
+app.post("https://backend-ml-1-4z88.onrender.com/gerar-pix", async (req, res) => {
   const {
     amount,
     name,
