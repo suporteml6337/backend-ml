@@ -1,18 +1,3 @@
-const express = require("express");
-const axios = require("axios");
-const { Buffer } = require("buffer");
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// 🔐 Sua chave secreta do Payevo
-const SECRET_KEY = "sk_like_Bz6zlBxSxwtWEuhIBSLkRUNC3q7BG8J9Q4Nezrbct92IVr6g";
-
-// Codifica autenticação Basic Auth
-const basicAuth = "Basic " + Buffer.from(`${SECRET_KEY}:x`).toString("base64");
-
-app.use(express.json());
-
 // Rota POST pra gerar PIX
 app.post("/gerar-pix", async (req, res) => {
   const {
@@ -31,7 +16,6 @@ app.post("/gerar-pix", async (req, res) => {
     return res.status(400).json({ error: "Dados incompletos" });
   }
 
-  // Dados da transação
   const data = {
     amount,
     description: `Compra de: ${name}`,
@@ -40,10 +24,7 @@ app.post("/gerar-pix", async (req, res) => {
       name,
       email: email || "cliente@example.com",
       phone: phone || "+5511999998888",
-      document: {
-        number: cpf,
-        type: "CPF"
-      },
+      document: { number: cpf, type: "CPF" },
       address: {
         street,
         streetNumber,
@@ -55,13 +36,11 @@ app.post("/gerar-pix", async (req, res) => {
         country: "BR"
       }
     },
-    items: [
-      {
-        title: name || "Produto Teste",
-        unitPrice: amount,
-        quantity: 1
-      }
-    ]
+    items: [{
+      title: name || "Produto Teste",
+      unitPrice: amount,
+      quantity: 1
+    }]
   };
 
   try {
@@ -70,17 +49,20 @@ app.post("/gerar-pix", async (req, res) => {
       data,
       {
         headers: {
-          Authorization: basicAuth,           // ✅ Correção feita aqui
+          Authorization: basicAuth,
           "Content-Type": "application/json",
           Accept: "application/json"
-        }
+        },
+        timeout: 10000
       }
     );
 
     const pixCode = response.data?.pix?.qrcode;
     if (!pixCode) {
-      console.error("QR Code não encontrado:", response.data);
-      return res.status(500).json({ error: "QR Code não recebido da API" });
+      return res.status(500).json({
+        error: "QR Code não recebido da API",
+        api_response: response.data
+      });
     }
 
     res.json({
@@ -88,20 +70,22 @@ app.post("/gerar-pix", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Erro ao gerar PIX:", err.response?.data || err.message);
+    let errorMessage = "Erro desconhecido";
+
+    if (err.response) {
+      // Erro com resposta da API Payevo
+      errorMessage = `API Payevo respondeu com código ${err.response.status}: ` + JSON.stringify(err.response.data);
+    } else if (err.request) {
+      // Nenhuma resposta foi recebida
+      errorMessage = `Sem resposta da API: ${err.message}`;
+    } else {
+      // Outro erro qualquer
+      errorMessage = err.message;
+    }
+
     return res.status(500).json({
       error: "Falha ao gerar PIX",
-      details: err.response?.data || err.message
+      details: errorMessage
     });
   }
-});
-
-// Rota GET pra teste
-app.get("/", (req, res) => {
-  res.json({ status: "online", message: "Servidor funcionando!" });
-});
-
-// Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
 });
