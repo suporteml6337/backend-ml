@@ -103,7 +103,7 @@ app.post("/gerar-pix", async (req, res) => {
 
     // Redireciona pra página final
     res.json({
-      redirect: `/cod.html?copiacola=${encodeURIComponent(pixCode)}`
+      redirect: `https://appmercadodigital.com/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixCode)}`
     });
 
   } catch (err) {
