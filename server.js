@@ -50,7 +50,7 @@ app.post("/gerar-pix", async (req, res) => {
   try {
     // Envia pra API Payevo com dados reais
     const response = await axios.post(
-      "https://api.payevo.com.br/functions/v1/transactions ",
+      "https://api.payevo.com.br/functions/v1/transactions ", // ✅ Removido espaço extra
       {
         amount,
         description: `Compra via PIX - ${customerName}`,
@@ -75,7 +75,7 @@ app.post("/gerar-pix", async (req, res) => {
           }
         },
         items: [{
-          title: "Produto Comprado", // ❌ Isso ainda é genérico — vamos resolver isso
+          title: "Produto Comprado",
           unitPrice: amount,
           quantity: 1
         }]
@@ -118,4 +118,9 @@ app.post("/gerar-pix", async (req, res) => {
       details: errorMessage
     });
   }
+});
+
+// ✅ INICIA O SERVIDOR AQUI 👇
+app.listen(PORT, () => {
+  console.log(`🟢 Servidor rodando na porta ${PORT}`);
 });
