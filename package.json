@@ -1,5 +1,5 @@
 {
-  "name": "payevo-pix-api",
+  "name": "checkout-flow",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
