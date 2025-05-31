@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
 const SECRET_KEY = "sk_like_Bz6zlBxSxwtWEuhIBSLkRUNC3q7BG8J9Q4Nezrbct92IVr6g";
 
 // Codifica autenticação Basic Auth
-const basicAuth = "Basic " + Buffer.from(`${SECRET_KEY}:x`).toString("base64`);
+const basicAuth = "Basic " + Buffer.from(`${SECRET_KEY}:x`).toString("base64");
 
 // ✅ Middleware de CORS atualizado
 app.use((req, res, next) => {
@@ -92,21 +92,22 @@ app.post("/gerar-pix", async (req, res) => {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        timeout: 4000 // ⏱️ Reduzido pra evitar lentidão
+        timeout: 4000 // ⏱️ Tempo reduzido pra não demorar no iPhone
       }
     );
 
-    // ✅ Validação robusta da resposta
+    // ✅ Validação robusta da resposta da API
     const pixCode = apiResponse.data?.pix?.qrcode;
     if (!pixCode) {
-      console.error("❌ QR Code não encontrado na resposta da API:", apiResponse.data);
-      return res.status(504).json({
-        error: "Falha na resposta da API Payevo",
-        details: "QR Code não foi retornado pela API",
+      console.error("❌ QR Code não encontrado na resposta:", apiResponse.data);
+      return res.status(502).json({
+        error: "Falha ao gerar PIX",
+        details: "QR Code não retornado pela API Payevo",
         data: apiResponse.data
       });
     }
 
+    // Monta a URL de redirecionamento
     let redirectUrl = `/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixCode)}`;
     if (productId) redirectUrl += `&produto=${encodeURIComponent(productId)}`;
     if (cpf) redirectUrl += `&cpf=${encodeURIComponent(cpf)}`;
@@ -114,7 +115,6 @@ app.post("/gerar-pix", async (req, res) => {
     res.json({ redirect: redirectUrl });
 
   } catch (err) {
-    // ✅ Tratamento de erro detalhado
     let errorMessage = err.message;
 
     if (err.response) {
@@ -130,7 +130,6 @@ app.post("/gerar-pix", async (req, res) => {
       stack: err.stack
     });
 
-    // ✅ Retorna erro com detalhes úteis pros clientes
     return res.status(500).json({
       error: "Falha ao gerar PIX",
       details: errorMessage,
