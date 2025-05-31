@@ -9,13 +9,18 @@ const PORT = process.env.PORT || 3000;
 const SECRET_KEY = "sk_like_Bz6zlBxSxwtWEuhIBSLkRUNC3q7BG8J9Q4Nezrbct92IVr6g";
 
 // Codifica autenticação Basic Auth
-const basicAuth = "Basic " + Buffer.from(`${SECRET_KEY}:x`).toString("base64");
+const basicAuth = "Basic " + Buffer.from(`${SECRET_KEY}:x`).toString("base64`);
 
-// ✅ Middleware de CORS
+// ✅ Middleware de CORS atualizado
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://appmercadodigital.com ');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  const origin = req.headers.origin;
+  const allowedOrigin = "https://appmercadodigital.com"; 
+
+  if (!origin || origin === allowedOrigin) {
+    res.header('Access-Control-Allow-Origin', allowedOrigin);
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  }
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end(); // Trata preflight
@@ -43,14 +48,15 @@ app.post("/gerar-pix", async (req, res) => {
     productId
   } = req.body;
 
+  // Campos obrigatórios
   if (!amount || !cpf || !street || !streetNumber || !neighborhood || !city) {
     return res.status(400).json({ error: "Dados obrigatórios faltando" });
   }
 
   try {
-    // Envia pra API Payevo com dados reais
-    const response = await axios.post(
-      "https://api.payevo.com.br/functions/v1/transactions ", // ✅ Removido espaço extra
+    // Envia pra API Payevo com timeout menor
+    const apiResponse = await axios.post(
+      "https://api.payevo.com.br/functions/v1/transactions", 
       {
         amount,
         description: `Compra via PIX - ${customerName}`,
@@ -86,14 +92,19 @@ app.post("/gerar-pix", async (req, res) => {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        timeout: 10000
+        timeout: 4000 // ⏱️ Reduzido pra evitar lentidão
       }
     );
 
-    const pixCode = response.data?.pix?.qrcode;
+    // ✅ Validação robusta da resposta
+    const pixCode = apiResponse.data?.pix?.qrcode;
     if (!pixCode) {
-      console.error("QR Code não encontrado:", response.data);
-      return res.status(500).json({ error: "QR Code não recebido da API" });
+      console.error("❌ QR Code não encontrado na resposta da API:", apiResponse.data);
+      return res.status(504).json({
+        error: "Falha na resposta da API Payevo",
+        details: "QR Code não foi retornado pela API",
+        data: apiResponse.data
+      });
     }
 
     let redirectUrl = `/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixCode)}`;
@@ -103,24 +114,32 @@ app.post("/gerar-pix", async (req, res) => {
     res.json({ redirect: redirectUrl });
 
   } catch (err) {
+    // ✅ Tratamento de erro detalhado
     let errorMessage = err.message;
 
     if (err.response) {
       errorMessage = `API Respondeu (${err.response.status}): ${JSON.stringify(err.response.data)}`;
     } else if (err.request) {
-      errorMessage = `Sem resposta da API. Timeout ou rede falhou.`;
+      errorMessage = `Timeout ou rede falhou. Nenhuma resposta da API.`;
     }
 
-    console.error("🚨 Erro completo:", err.toJSON ? err.toJSON() : err);
+    console.error("🚨 Erro completo:", {
+      message: err.message,
+      request: err.request ? "Requisição feita, sem resposta clara" : null,
+      response: err.response?.data || null,
+      stack: err.stack
+    });
 
+    // ✅ Retorna erro com detalhes úteis pros clientes
     return res.status(500).json({
       error: "Falha ao gerar PIX",
-      details: errorMessage
+      details: errorMessage,
+      timestamp: new Date().toISOString()
     });
   }
 });
 
-// ✅ INICIA O SERVIDOR AQUI 👇
+// ✅ Inicia o servidor
 app.listen(PORT, () => {
   console.log(`🟢 Servidor rodando na porta ${PORT}`);
 });
