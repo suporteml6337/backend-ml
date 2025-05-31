@@ -1,46 +1,4 @@
-const express = require("express");
-const axios = require("axios");
-const { Buffer } = require("buffer");
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// 🔐 Sua chave secreta do Payevo
-const SECRET_KEY = "sk_like_Bz6zlBxSxwtWEuhIBSLkRUNC3q7BG8J9Q4Nezrbct92IVr6g";
-
-// Codifica autenticação Basic Auth
-const basicAuth = "Basic " + Buffer.from(`${SECRET_KEY}:x`).toString("base64");
-
-// ✅ Middleware de CORS atualizado
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  const allowedOrigin = "https://appmercadodigital.com"; 
-
-  if (!origin || origin === allowedOrigin) {
-    res.header('Access-Control-Allow-Origin', allowedOrigin);
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    res.header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  }
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end(); // Trata preflight
-  }
-
-  next();
-});
-
-app.use(express.json());
-
-// Função para gerar payload PIX localmente (fallback)
-function gerarPixFallback(customerName, cpf, street, city, amount) {
-  // Exemplo simples de copiacola fixo pra teste
-  const valorFormatado = (amount / 100).toFixed(2); // 17175 → 171.75
-
-  // Simula um copiacola real
-  return `00020126580014br.gov.bcb.pix0136fakesample-guid${cpf}0212Compra via PIX030452040406167.905802BR5911PAYFLEXLTDA6009SAOPAULO62250521mpqrinter113136325620630430316304${valorFormatado}`;
-}
-
-// Rota POST pra gerar PIX com fallback
+// Rota POST pra gerar PIX
 app.post("/gerar-pix", async (req, res) => {
   const {
     amount,
@@ -62,7 +20,7 @@ app.post("/gerar-pix", async (req, res) => {
   }
 
   try {
-    // Tenta chamar a API principal com timeout curto
+    // Tenta chamar a API Payevo
     const apiResponse = await axios.post(
       "https://api.payevo.com.br/functions/v1/transactions", 
       {
@@ -100,47 +58,58 @@ app.post("/gerar-pix", async (req, res) => {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        timeout: 4000 // ⏱️ Tempo reduzido pra evitar travamento
+        timeout: 4000
       }
     );
 
-    // Se der certo, retorna o QR Code real
+    console.log("📨 Resposta da API Payevo:", apiResponse.data);
+
+    // ✅ Valida se veio o qrcode
     const pixCode = apiResponse.data?.pix?.qrcode;
 
-    if (pixCode) {
-      let redirectUrl = `/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixCode)}`;
-      if (productId) redirectUrl += `&produto=${encodeURIComponent(productId)}`;
-      if (cpf) redirectUrl += `&cpf=${encodeURIComponent(cpf)}`;
+    if (!pixCode) {
+      console.warn("⚠️ QR Code não encontrado na resposta da API");
+      
+      // 💡 Aqui você pode:
+      // 1. Registrar o pedido localmente
+      // 2. Usar um payload fixo pra continuar o fluxo
+      // 3. Notificar você por e-mail ou log
 
-      return res.json({ redirect: redirectUrl });
+      // Gera um copiacola simulado como fallback
+      const pixFallback = gerarPixFallback(customerName, cpf, street, city, amount, productId);
 
-    } else {
-      console.warn("⚠️ API Payevo não retornou 'pix.qrcode'");
+      let redirectUrl = `/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixFallback)}&produto=${encodeURIComponent(productId || "")}&cpf=${encodeURIComponent(cpf)}`;
+
+      return res.json({
+        redirect: redirectUrl,
+        fallback: true,
+        details: "API Payevo não retornou 'pix.qrcode'. Usando fallback temporário."
+      });
     }
 
+    // ✅ Se tudo der certo, redireciona com o código real
+    let redirectUrl = `/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixCode)}&produto=${encodeURIComponent(productId)}&cpf=${encodeURIComponent(cpf)}`;
+
+    res.json({ redirect: redirectUrl });
+
   } catch (err) {
-    console.error("🚨 Erro na API Payevo:", {
+    console.error("🚨 Erro ao gerar PIX:", {
       message: err.message,
       status: err.response?.status,
       data: err.response?.data || null,
-      request: !!err.request,
-      stack: err.stack
+      request: !!err.request
     });
 
-    // Fallback: gera um PIX simulado
-    const pixFallback = gerarPixFallback(customerName, cpf, city, amount);
+    // Fallback caso dê erro total
+    const pixFallback = gerarPixFallback(customerName, cpf, street, city, amount, productId);
 
-    let redirectUrl = `/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixFallback)}&produto=${encodeURIComponent(productId || "")}&cpf=${encodeURIComponent(cpf)}`;
+    redirectUrl = `/tela-02/produtos/Checkout/page-da-chave-pix/pagamento-via-pix/pages/cod.html?copiacola=${encodeURIComponent(pixFallback)}&produto=${encodeURIComponent(productId)}&cpf=${encodeURIComponent(cpf)}`;
 
-    return res.json({
+    return res.status(500).json({
       redirect: redirectUrl,
       fallback: true,
-      details: "API Payevo fora do ar. Usando código PIX temporário."
+      details: "Falha completa na API Payevo. Usando PIX simulado.",
+      error: err.message
     });
   }
-});
-
-// ✅ Inicia o servidor
-app.listen(PORT, () => {
-  console.log(`🟢 Servidor rodando na porta ${PORT}`);
 });
